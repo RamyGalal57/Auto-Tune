@@ -18,16 +18,69 @@ set "workDir=%TEMP%\AutoTune"
 :: --- Admin Check ---
 net.exe session >NUL 2>&1 || goto :not_admin
 
-:: --- Auto-Update (DISABLED FOR SECURITY) ---
+REM ============================================
+REM AUTO-UPDATE SECTION
+REM ============================================
 ECHO.
-ECHO  ***************************************************************************************
-ECHO  ** The auto-update feature has been disabled to prevent security risks.            **
-ECHO  ** To get the latest version, please visit:                                        **
-ECHO  ** https://github.com/RpJect/Auto-Tune                                             **
-ECHO  ***************************************************************************************
+ECHO Checking for updates...
 ECHO.
-REM The original auto-update command was a security risk (Remote Code Execution) and has been removed.
-REM Original command: curl --connect-timeout 300  -o "%filePath%" -0  -# https://raw.githubusercontent.com/RpJect/Auto-Tune/main/AutoTuneOnline.bat"
+
+set "filePath=%~f0"
+set "tempFile=%TEMP%\AutoTuneUpdate.bat"
+set "updateURL=https://raw.githubusercontent.com/RamyGalal57/Auto-Tune/refs/heads/fix/comprehensive-script-audit/AutoTuneOnline.bat"
+
+REM Check internet connectivity first
+ping -n 1 github.com >NUL 2>&1
+IF %ERRORLEVEL% NEQ 0 (
+    ECHO No internet connection. Skipping update check.
+    goto :skip_update
+)
+
+REM Download update to temp location
+curl --connect-timeout 30 --max-time 300 -o "%tempFile%" -0 -# "%updateURL%"
+
+IF %ERRORLEVEL% NEQ 0 (
+    ECHO Update download failed. Continuing with current version.
+    if exist "%tempFile%" del "%tempFile%" >NUL 2>&1
+    goto :skip_update
+)
+
+REM Validate downloaded file is not empty
+FOR %%A IN ("%tempFile%") DO (
+    IF %%~zA LSS 1000 (
+        ECHO Downloaded file appears invalid. Skipping update.
+        del "%tempFile%" >NUL 2>&1
+        goto :skip_update
+    )
+)
+
+REM Validate downloaded file contains expected content
+FINDSTR /C:"AUTO TUNE" "%tempFile%" >NUL 2>&1
+IF %ERRORLEVEL% NEQ 0 (
+    ECHO Downloaded file validation failed. Skipping update.
+    del "%tempFile%" >NUL 2>&1
+    goto :skip_update
+)
+
+REM Apply update
+ECHO Update validated. Applying...
+copy /Y "%tempFile%" "%filePath%" >NUL 2>&1
+IF %ERRORLEVEL% EQU 0 (
+    ECHO Update applied successfully!
+    del "%tempFile%" >NUL 2>&1
+    ECHO Restarting with new version...
+    timeout /t 2 /nobreak >NUL
+    start "" "%filePath%"
+    exit
+) ELSE (
+    ECHO Failed to apply update. Continuing with current version.
+    del "%tempFile%" >NUL 2>&1
+)
+
+:skip_update
+REM ============================================
+REM END AUTO-UPDATE SECTION
+REM ============================================
 
 @color 03
 @cls
